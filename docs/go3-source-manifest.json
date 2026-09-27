@@ -1,0 +1,20 @@
+{
+  "upstream": "https://github.com/xfangfang/wiliwili",
+  "commit": "88e5876bea9502d06f46a8656e3530684d3aaf7d",
+  "source_match": "App sources match supplied archive ignoring line endings; all submodules restored at upstream pins.",
+  "submodules": [
+    " 7739ba4b2d87395446bbdcad6ae8bf9131b4250b library/MemoryModule (7739ba4)",
+    " ccae908834c2fe41ba02141fa5d0eef178a45080 library/OpenCC (heads/master)",
+    " 720f62bddb7226106071d4728c292cb1df519ceb library/QR-Code-generator (720f62b)",
+    " 5f08b286f3df737f3321d2247a6fe633fcead03c library/borealis (heads/wiliwili)",
+    " 15ead9a40d09a1eb9972215cceac2bf29c9b77f6 library/borealis/library/lib/extern/SDL (15ead9a)",
+    " 892256c3f630739fb02552544b8d83240883ec8a library/borealis/library/lib/extern/glfw (heads/wiliwili_3_4_win_ime)",
+    " ef35a614f1feb6ba0d4de13b1950bcaf7faad060 library/cpr (ef35a61)",
+    " 9dd3ab920940adac013a3cf40e3a5805d7e193e1 library/libpdr (heads/master)",
+    " f924651b85cac47dbe15f51a4aa320461fc1d07b library/lunasvg (f924651)",
+    " 4328842400370f62d00b6a6b23f1cbe0cded4073 library/mongoose (4328842)",
+    " 7d16bc814ccb4cad03c300dcb77440034caa84f7 library/pystring (7d16bc8)"
+  ],
+  "target": "Windows x64 GLFW OpenGL UCRT64",
+  "go3_revision": "v5-clean-exit-controls"
+}
