@@ -70,12 +70,6 @@
 产物在 `dist` 目录，打包脚本会递归收集 EXE/DLL 依赖并附带许可证和 SHA256 清单。
 回归测试源码在 `tests/` 目录。
 
-## 已知限制
-
-自动化测试覆盖了旋转坐标、下拉刷新阈值和播放器集成流程，但重力传感器、键盘背折、
-Windows 边缘手势这些需要在实机上验证，桌面测试无法保证。
-测试记录见 [docs/GO3-VALIDATION.md](docs/GO3-VALIDATION.md)。
-
 ## 许可证
 
 原项目 [xfangfang/wiliwili](https://github.com/xfangfang/wiliwili) 使用 GPL-3.0，

@@ -23,9 +23,8 @@ while pending:
         elif not (system/name).exists() and not name.lower().startswith(('api-ms-','ext-ms-')): missing.add(name)
 if missing: raise SystemExit('Unresolved DLLs: '+', '.join(sorted(missing)))
 shutil.copy2(repo/'LICENSE',output/'LICENSE')
-shutil.copy2(repo/'docs/GO3-WINDOWS.md',output/'README-Go3.md')
+shutil.copy2(repo/'docs/GO3-WINDOWS.md',output/'README.md')
 shutil.copy2(repo/'docs/go3-source-manifest.json',output/'source-manifest.json')
-shutil.copy2(repo/'docs/GO3-VALIDATION.md',output/'GO3-VALIDATION.md')
 # Include dependency license texts distributed by MSYS2.
 licenses=output/'licenses'; licenses.mkdir(exist_ok=True)
 for folder in (prefix/'share/licenses').iterdir():
