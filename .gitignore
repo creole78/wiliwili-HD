@@ -21,6 +21,8 @@ repo/
 /winrt/AppxManifest.xml
 libromfs-generator
 build-*
+# 构建输出目录不提交，但 Windows 构建脚本要跟随源码
+!scripts/windows/build-go3.ps1
 android-project
 *.deb
 *.dmp

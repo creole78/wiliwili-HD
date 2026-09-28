@@ -737,8 +737,14 @@ void ProgramConfig::load() {
     ShortcutHelper::setNext(getSettingItem(SettingItem::SHORTCUT_NEXT, std::string{"pgdn"}));
     ShortcutHelper::setLastSub(getSettingItem(SettingItem::SHORTCUT_LAST_SUB, std::string{"shift-pgup"}));
     ShortcutHelper::setNextSub(getSettingItem(SettingItem::SHORTCUT_NEXT_SUB, std::string{"shift-pgdn"}));
+#ifdef _WIN32
+    // Windows 桌面版播放器把数字键让给"跳转进度"（网页端逻辑），音量改用 - 和 =
+    ShortcutHelper::setVolumeUp(getSettingItem(SettingItem::SHORTCUT_VOLUME_UP, std::string{"="}));
+    ShortcutHelper::setVolumeDown(getSettingItem(SettingItem::SHORTCUT_VOLUME_DOWN, std::string{"-"}));
+#else
     ShortcutHelper::setVolumeUp(getSettingItem(SettingItem::SHORTCUT_VOLUME_UP, std::string{"0"}));
     ShortcutHelper::setVolumeDown(getSettingItem(SettingItem::SHORTCUT_VOLUME_DOWN, std::string{"9"}));
+#endif
     ShortcutHelper::setDanmaku(getSettingItem(SettingItem::SHORTCUT_DANMAKU, std::string{"d"}));
     ShortcutHelper::setVideoProfile(getSettingItem(SettingItem::SHORTCUT_VIDEO_PROFILE, std::string{"f1"}));
     ShortcutHelper::setVideoQuality(getSettingItem(SettingItem::SHORTCUT_VIDEO_QUALITY, std::string{"f2"}));

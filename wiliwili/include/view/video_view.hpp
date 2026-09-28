@@ -239,6 +239,21 @@ public:
 
     void registerCommonActions(brls::Activity* activity);
 
+#ifdef _WIN32
+    /// 注册网页端风格的播放器键盘操作（仅 Windows 桌面版）
+    /// 左/右：快退/快进 5 秒，上/下：音量 ±5，M：静音，F：全屏，0-9：跳转到 0%~90%
+    void registerWebKeyboardActions();
+
+    /// 方向键当前是否按网页端逻辑处理（用于屏蔽方向键的焦点移动）
+    bool isWebKeyboardActive();
+
+    /// 静音开关（沿用音量 0 表示静音）
+    void toggleMute();
+
+    /// 刷新控制栏的音量图标，静音时显示斜杠图标（volume 为即将生效的音量）
+    void refreshVolumeIcon(int volume);
+#endif
+
     // 用于 VideoView 可以接收的自定义事件
     inline static const std::string QUALITY_CHANGE = "QUALITY_CHANGE";
     inline static const std::string SET_ONLINE_NUM = "SET_ONLINE_NUM";
@@ -385,6 +400,12 @@ private:
     void requestVolume(int volume, int delay = 0);
     int volume_init    = 0;
     size_t volume_iter = 0;  // 音量UI关闭的延迟函数 handle
+#ifdef _WIN32
+    // 静音前的音量，按 M 恢复时使用
+    int volumeBeforeMute = 100;
+    // 控制栏音量图标当前是否为静音样式
+    bool volumeIconMuted = false;
+#endif
 
     /**
      * 预览应用背光调节，实时调节

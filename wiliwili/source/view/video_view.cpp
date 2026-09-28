@@ -527,6 +527,11 @@ VideoView::VideoView() {
     this->registerAction("", brls::ControllerButton::BUTTON_RIGHT, sliderFunc, true);
     this->registerAction("", brls::ControllerButton::BUTTON_LEFT, sliderFunc, true);
 
+#ifdef _WIN32
+    // Windows 桌面版：追加网页端风格的键盘操作
+    this->registerWebKeyboardActions();
+#endif
+
     // 自定义的mpv事件
     customEventSubscribeID = APP_E->subscribe([this](const std::string& event, void* data) {
         if (event == VideoView::SET_TITLE) {
@@ -565,6 +570,9 @@ void VideoView::requestVolume(int volume, int delay) {
     if (volume < 0) volume = 0;
     if (volume > 100) volume = 100;
     MPVCore::instance().setVolume(volume);
+#ifdef _WIN32
+    this->refreshVolumeIcon(volume);
+#endif
     setCenterHintText(fmt::format("{} %", volume));
     if (delay == 0) return;
     if (volume_iter == 0) {
@@ -1700,6 +1708,113 @@ void VideoView::onChildFocusGained(View* directChild, View* focusedView) {
 }
 
 float VideoView::getRealDuration() { return real_duration > 0 ? (float)real_duration : (float)mpvCore->duration; }
+
+#ifdef _WIN32
+bool VideoView::isWebKeyboardActive() {
+    // TV 控制模式、OSD 锁定时保留原有的方向键逻辑
+    if (this->isTvControlMode || this->is_osd_lock) return false;
+    // 焦点停在 OSD 控件上时，方向键继续用于在控件之间切换
+    if (this->isChildFocused()) return false;
+    return true;
+}
+
+void VideoView::registerWebKeyboardActions() {
+    // 左/右：快退/快进 5 秒（网页端左右键）
+    auto seekFunc = [this](int delta) -> bool {
+        // 焦点位于 OSD 控件上时，方向键仍用于切换控件
+        if (!this->isWebKeyboardActive()) return false;
+        CHECK_OSD(true);
+        if (this->isLiveMode || this->getRealDuration() <= 0) return true;
+        seeking_range += delta;
+        this->requestSeeking(seeking_range);
+        return true;
+    };
+    this->registerAction(brls::BrlsKeyCombination(brls::BRLS_KBD_KEY_LEFT),
+                         [seekFunc](brls::View*) { return seekFunc(-5); }, true);
+    this->registerAction(brls::BrlsKeyCombination(brls::BRLS_KBD_KEY_RIGHT),
+                         [seekFunc](brls::View*) { return seekFunc(5); }, true);
+
+    // 上/下：音量 +/-5（网页端上下键）
+    auto volumeFunc = [this](int delta) -> bool {
+        // 焦点位于 OSD 控件上时，方向键仍用于切换控件
+        if (!this->isWebKeyboardActive()) return false;
+        CHECK_OSD(true);
+        this->requestVolume((int)mpvCore->volume + delta, 400);
+        return true;
+    };
+    this->registerAction(brls::BrlsKeyCombination(brls::BRLS_KBD_KEY_UP),
+                         [volumeFunc](brls::View*) { return volumeFunc(5); }, true);
+    this->registerAction(brls::BrlsKeyCombination(brls::BRLS_KBD_KEY_DOWN),
+                         [volumeFunc](brls::View*) { return volumeFunc(-5); }, true);
+
+    // M：静音开关（网页端 M 键）
+    this->registerAction(brls::BrlsKeyCombination(brls::BRLS_KBD_KEY_M), [this](brls::View*) -> bool {
+        CHECK_OSD(true);
+        this->toggleMute();
+        return true;
+    });
+
+    // F：全屏/退出全屏（网页端 F 键）
+    this->registerAction(brls::BrlsKeyCombination(brls::BRLS_KBD_KEY_F), [this](brls::View*) -> bool {
+        CHECK_OSD(false);
+        if (!this->allowFullscreen) return true;
+        if (this->isFullscreen()) {
+            this->setFullScreen(false);
+        } else {
+            this->setFullScreen(true);
+        }
+        return true;
+    });
+
+    // 0-9：跳转到 0%~90% 进度（网页端数字键）
+    for (int i = 0; i < 10; i++) {
+        auto key = static_cast<brls::BrlsKeyboardScancode>(brls::BRLS_KBD_KEY_0 + i);
+        this->registerAction(brls::BrlsKeyCombination(key), [this, i](brls::View*) -> bool {
+            CHECK_OSD(true);
+            if (this->isLiveMode || this->getRealDuration() <= 0) return true;
+            this->showOSD(true);
+            mpvCore->seek((int64_t)(this->getRealDuration() * i / 10.0f));
+            return true;
+        });
+    }
+
+    // 方向键同时会被当作手柄 D-pad 用于移动焦点，
+    // 网页键盘模式下把这些导航按键消费掉，避免按方向键时焦点被移出播放器。
+    // 手柄十字键（未按键盘方向键）不受影响。
+    auto suppressNav = [this](brls::BrlsKeyboardScancode kbdKey) {
+        return [this, kbdKey](brls::View*) -> bool {
+            if (!this->isWebKeyboardActive()) return false;
+            return this->input != nullptr && this->input->getKeyboardKeyState(kbdKey);
+        };
+    };
+    this->registerAction("", brls::ControllerButton::BUTTON_NAV_LEFT, suppressNav(brls::BRLS_KBD_KEY_LEFT), true);
+    this->registerAction("", brls::ControllerButton::BUTTON_NAV_RIGHT, suppressNav(brls::BRLS_KBD_KEY_RIGHT), true);
+    this->registerAction("", brls::ControllerButton::BUTTON_NAV_UP, suppressNav(brls::BRLS_KBD_KEY_UP), true);
+    this->registerAction("", brls::ControllerButton::BUTTON_NAV_DOWN, suppressNav(brls::BRLS_KBD_KEY_DOWN), true);
+}
+
+void VideoView::toggleMute() {
+    auto& core = MPVCore::instance();
+    const bool mute = core.volume > 0;
+    int target      = this->volumeBeforeMute > 0 ? this->volumeBeforeMute : 100;
+    if (mute) {
+        // 静音：记录当前音量然后把音量置 0
+        this->volumeBeforeMute = (int)core.volume;
+        target                 = 0;
+    }
+    this->requestVolume(target, 400);
+    // 静音只作用于本次播放，不把 0 写进“下次播放音量”
+    if (mute) MPVCore::VIDEO_VOLUME = this->volumeBeforeMute;
+}
+
+void VideoView::refreshVolumeIcon(int volume) {
+    const bool muted = volume <= 0;
+    if (this->volumeIconMuted == muted) return;
+    this->volumeIconMuted = muted;
+    this->btnVolumeIcon->setImageFromSVGRes(
+        muted ? "svg/bpx-svg-sprite-volume-off.svg" : "svg/bpx-svg-sprite-volume.svg");
+}
+#endif
 
 void VideoView::registerCommonActions(brls::Activity* activity) {
 #ifdef _WIN32

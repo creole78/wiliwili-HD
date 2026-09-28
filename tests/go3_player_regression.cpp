@@ -2,6 +2,7 @@
 // Uses a public test video and an isolated WILIWILI_CONFIG_DIR. No OS input automation.
 #include <borealis.hpp>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <algorithm>
 #include <borealis/platforms/glfw/glfw_video.hpp>
@@ -157,7 +158,86 @@ void exitRegressionTick(const std::string& scenario) {
     }
     check(false,"exit action binding missing");
 }
+void pressKey(brls::BrlsKeyboardScancode key) {
+    brls::Application::onKeyboardPressed(brls::BrlsKeyCombination(key), false);
+}
+// Opt-in scenario that drives the web-like player keys through the real view tree.
+int64_t keyAt = 0;
+brls::Activity* keyboardPlayerPage = nullptr;
+void keyboardRegressionTick() {
+    if (phase < 0) return;
+    double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now()-phaseStart).count();
+    if (!check(elapsed < 65,"keyboard phase timed out")) return;
+    if (elapsed < 0.3) return;
+    auto pages = brls::Application::getActivitiesStack();
+    if (pages.empty()) return;
+    auto* top = pages.back();
+    auto& mpv = MPVCore::instance();
+    switch (phase) {
+        case 0:
+            if (!check(std::getenv("WILIWILI_CONFIG_DIR") != nullptr,"isolated profile required")) return;
+            Intent::openBV("BV1JMec6xEPQ",0,0);
+            advance(); break;
+        case 1: {
+            if (!mpv.isPlaying() || mpv.video_progress < 3) return;
+            auto* video = dynamic_cast<VideoView*>(top->getView("video"));
+            if (!check(video != nullptr,"player view missing")) return;
+            keyboardPlayerPage = top;
+            brls::Application::giveFocus(video);
+            mpv.pause();
+            keyAt = mpv.video_progress;
+            pressKey(brls::BRLS_KBD_KEY_RIGHT);
+            advance(); break;
+        }
+        case 2:
+            // 右方向键：等待 400ms 延迟跳转生效，进度前进 5 秒
+            if (mpv.video_progress < keyAt + 4) return;
+            if (!check(mpv.video_progress <= keyAt + 7,"right arrow seek out of range")) return;
+            pressKey(brls::BRLS_KBD_KEY_LEFT);
+            advance(); break;
+        case 3:
+            // 左方向键：退回原位
+            if (mpv.video_progress > keyAt + 1) return;
+            if (!check(mpv.video_progress >= keyAt - 1,"left arrow seek out of range")) return;
+            pressKey(brls::BRLS_KBD_KEY_M);
+            advance(); break;
+        case 4:
+            if (mpv.volume != 0) return;
+            if (!check(MPVCore::VIDEO_VOLUME > 0,"mute must not overwrite the saved volume")) return;
+            pressKey(brls::BRLS_KBD_KEY_M);
+            advance(); break;
+        case 5: {
+            if (mpv.volume == 0) return;
+            if (!check(MPVCore::VIDEO_VOLUME == mpv.volume,"unmute did not restore the volume")) return;
+            pressKey(brls::BRLS_KBD_KEY_5);
+            advance(); break;
+        }
+        case 6: {
+            double target = mpv.duration / 2;
+            if (mpv.video_progress < target - 3) return;
+            if (!check(std::abs(mpv.video_progress - target) <= 4,"digit key did not seek to 50%")) return;
+            pressKey(brls::BRLS_KBD_KEY_F);
+            advance(); break;
+        }
+        case 7: {
+            if (pages.back() == keyboardPlayerPage) return;
+            auto* fullscreen = dynamic_cast<VideoView*>(pages.back()->getView("video"));
+            if (!check(fullscreen != nullptr,"fullscreen page missing")) return;
+            if (!fullscreen->isFullscreen()) return;
+            pressKey(brls::BRLS_KBD_KEY_F);
+            advance(); break;
+        }
+        case 8:
+            // F：再按一次退出全屏（退出是异步的，等到页面弹出为止）
+            if (pages.back() != keyboardPlayerPage) return;
+            result = 0; phase = -1;
+            brls::Logger::info("GO3 KEYBOARD PASS: arrows seek, mute toggle, digit seek, fullscreen toggle");
+            brls::Application::quit();
+            break;
+    }
+}
 void go3PlayerRegressionTick() {
+    if (std::getenv("GO3_KEYBOARD_SCENARIO")) { keyboardRegressionTick(); return; }
     if (const char* scenario = std::getenv("GO3_EXIT_SCENARIO")) { exitRegressionTick(scenario); return; }
     if (phase < 0) return;
     double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now()-phaseStart).count();
