@@ -59,7 +59,7 @@
 
 ## 下载
 
-到 [Releases](../../releases) 下载 `wiliwili-HD-Windows-x64-v1.0.zip`，完整解压后运行
+到 [Releases](../../releases) 下载 `wiliwili-HD-Windows-x64-v1.1.zip`，完整解压后运行
 `wiliwili.exe`。不要只复制 EXE，同目录的 DLL 是播放器和网络运行库。
 适用于 Windows 10/11 x64，目标电脑不需要安装 MSYS2。
 
