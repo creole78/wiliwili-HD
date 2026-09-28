@@ -63,8 +63,14 @@ VideoView::VideoView() {
     this->inflateFromXMLRes("xml/views/video_view.xml");
 #ifdef _WIN32
     // These OSD controls exist in both the detail player and fullscreen player.
+    auto* desktopActions = new brls::Box();
+    desktopActions->setAxis(brls::Axis::ROW);
+    desktopActions->applyXMLAttribute("positionType", "absolute");
+    desktopActions->setPositionTop(10);
+    desktopActions->setPositionRight(130);
+    desktopActions->setHeight(60);
     const bool chinese = brls::Application::getLocale().rfind("zh", 0) == 0;
-    auto addDesktopAction = [](brls::Box* parent, const std::string& title, std::function<void()> action) {
+    auto addDesktopAction = [desktopActions](const std::string& title, std::function<void()> action) {
         auto* button = new brls::Button();
         button->setText(title);
         button->setFontSize(18);
@@ -74,37 +80,15 @@ VideoView::VideoView() {
         button->setStyle(&brls::BUTTONSTYLE_BORDERLESS);
         button->setTextColor(nvgRGB(255,255,255));
         button->registerClickAction([action](brls::View*) { brls::sync(action); return true; });
-        parent->addView(button);
+        desktopActions->addView(button);
         return button;
     };
-
-    // 右上角：后台浏览 / 最小化
-    auto* desktopActions = new brls::Box();
-    desktopActions->setAxis(brls::Axis::ROW);
-    desktopActions->applyXMLAttribute("positionType", "absolute");
-    desktopActions->setPositionTop(10);
-    desktopActions->setPositionRight(130);
-    desktopActions->setHeight(60);
-    addDesktopAction(desktopActions, chinese ? "后台浏览" : "Browse", [] { Intent::backgroundPlayer(); });
-    addDesktopAction(desktopActions, chinese ? "最小化" : "Minimize", [] {
+    addDesktopAction(chinese ? "后台浏览" : "Browse", [] { Intent::backgroundPlayer(); });
+    addDesktopAction(chinese ? "最小化" : "Minimize", [] {
         brls::Application::getPlatform()->minimizeWindow();
     });
+    addDesktopAction(chinese ? "退出程序" : "Quit", [] { Intent::quitApplication(); })->setId("video/app-exit");
     osdTopBox->addView(desktopActions);
-
-    // 左上角：退出程序（与“最小化”分开摆放，避免误触）
-    auto* quitAction = new brls::Box();
-    quitAction->applyXMLAttribute("positionType", "absolute");
-    quitAction->setPositionTop(6);
-    quitAction->setPositionLeft(20);
-    quitAction->setHeight(50);
-    auto* quitButton =
-        addDesktopAction(quitAction, chinese ? "退出程序" : "Quit", [] { Intent::quitApplication(); });
-    quitButton->setId("video/app-exit");
-    quitButton->setHeight(50);
-    osdTopBox->addView(quitAction);
-
-    // 标题右移，给左上角的退出按钮让出位置
-    this->getView("video/osd/title")->setMarginLeft(150);
     this->getView("video/osd/title")->setMarginRight(460);
 #endif
 
