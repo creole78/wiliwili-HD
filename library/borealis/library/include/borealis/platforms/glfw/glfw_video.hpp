@@ -51,6 +51,8 @@ class GLFWVideoContext : public VideoContext
   private:
     GLFWwindow* window     = nullptr;
     NVGcontext* nvgContext = nullptr;
+    // Windows：窗口先以隐藏状态创建，首帧呈现后再显示，避免启动时闪黑
+    bool pendingFirstFrameShow = false;
 
 #ifdef __SWITCH__
     int oldWidth, oldHeight;

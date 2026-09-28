@@ -259,6 +259,12 @@ GLFWVideoContext::GLFWVideoContext(const std::string& windowTitle, uint32_t wind
 
 // create window
 #if defined(__linux__) || defined(_WIN32) || defined(__APPLE__)
+#ifdef _WIN32
+    // Windows 下先创建隐藏窗口，等第一帧真正呈现后再显示，
+    // 否则窗口会以未绘制的黑色（或未初始化的画面）闪一下。
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    this->pendingFirstFrameShow = true;
+#endif
     if (VideoContext::FULLSCREEN)
     {
 #ifdef _WIN32
@@ -455,6 +461,15 @@ void GLFWVideoContext::endFrame()
 {
 #ifdef BOREALIS_USE_OPENGL
     glfwSwapBuffers(this->window);
+#ifdef _WIN32
+    if (this->pendingFirstFrameShow)
+    {
+        // 首帧已经提交到窗口，此时再显示，启动过程不会出现闪黑。
+        this->pendingFirstFrameShow = false;
+        glfwShowWindow(this->window);
+        brls::Logger::info("glfw: window shown after the first presented frame");
+    }
+#endif
 #elif defined(BOREALIS_USE_D3D11)
     D3D11_CONTEXT->endFrame();
 #endif

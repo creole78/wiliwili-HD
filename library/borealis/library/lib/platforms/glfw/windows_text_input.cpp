@@ -12,6 +12,7 @@
 #include <roapi.h>
 #include <winstring.h>
 #include <borealis/core/application.hpp>
+#include <borealis/core/logger.hpp>
 #include <borealis/core/thread.hpp>
 #include <functional>
 #include <string>
@@ -191,10 +192,15 @@ bool openWindowsTextInput(GLFWwindow* window, std::function<void(std::string)> c
     MONITORINFO monitor{sizeof(MONITORINFO)};
     GetMonitorInfoW(MonitorFromWindow(data->owner,MONITOR_DEFAULTTONEAREST), &monitor);
     int left = std::max((int)monitor.rcWork.left, (int)std::min(owner.left + ((owner.right-owner.left)-width)/2, monitor.rcWork.right-width));
-    HWND hwnd = CreateWindowExW(WS_EX_DLGMODALFRAME,className,toWide(title).c_str(),
+    // WS_EX_LAYERED：窗口先以全透明状态显示并完成整窗绘制，再切回不透明，
+    // 避免弹出时先看到一个尚未绘制（发黑）的空窗口。
+    HWND hwnd = CreateWindowExW(WS_EX_DLGMODALFRAME|WS_EX_LAYERED,className,toWide(title).c_str(),
         WS_POPUP|WS_CAPTION|WS_SYSMENU|WS_CLIPCHILDREN,left,
         monitor.rcWork.top+px(24),width,height,data->owner,nullptr,instance,data);
-    if (!hwnd) { DeleteObject(data->background); delete data; return false; }
+    if (!hwnd) {
+        brls::Logger::error("native text input: CreateWindowExW failed ({})", GetLastError());
+        DeleteObject(data->background); delete data; return false;
+    }
     data->ownsLifetime = true;
     activeTextWindow = hwnd;
     data->font = CreateFontW(-px(20),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
@@ -216,8 +222,12 @@ bool openWindowsTextInput(GLFWwindow* window, std::function<void(std::string)> c
     control(0,L"BUTTON",zh?L"触摸键盘":L"Touch keyboard",WS_TABSTOP,px(18),px(117),px(145),px(42),1003);
     control(0,L"BUTTON",zh?L"取消":L"Cancel",WS_TABSTOP,width-px(250),px(117),px(105),px(42),IDCANCEL);
     control(0,L"BUTTON",zh?L"确定":L"OK",WS_TABSTOP|BS_DEFPUSHBUTTON,width-px(130),px(117),px(105),px(42),IDOK);
+    // 全透明状态下显示并同步绘制整个对话框（含子控件），绘制完成后再显示内容
+    SetLayeredWindowAttributes(hwnd,0,0,LWA_ALPHA);
     // Transfer activation directly to the owned dialog before disabling its owner.
     ShowWindow(hwnd,SW_SHOW);
+    RedrawWindow(hwnd,nullptr,nullptr,RDW_INVALIDATE|RDW_ERASE|RDW_FRAME|RDW_ALLCHILDREN|RDW_UPDATENOW);
+    SetLayeredWindowAttributes(hwnd,0,255,LWA_ALPHA);
     SetFocus(data->edit);
     EnableWindow(data->owner,FALSE);
     Application::setActiveEvent(true);

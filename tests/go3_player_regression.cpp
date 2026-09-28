@@ -5,6 +5,18 @@
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#ifndef GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_NONE
+#endif
+#include <GLFW/glfw3.h>
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 #include <borealis/platforms/glfw/glfw_video.hpp>
 #include "utils/activity_helper.hpp"
 #include "activity/main_activity.hpp"
@@ -161,6 +173,46 @@ void exitRegressionTick(const std::string& scenario) {
 void pressKey(brls::BrlsKeyboardScancode key) {
     brls::Application::onKeyboardPressed(brls::BrlsKeyCombination(key), false);
 }
+// Opt-in scenario that drives the native Windows text input dialog.
+std::string imeResult;
+void imeRegressionTick() {
+    if (phase < 0) return;
+    double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now()-phaseStart).count();
+    if (!check(elapsed < 30,"ime phase timed out")) return;
+    if (elapsed < 1) return;
+    auto* window = testWindow();
+    switch (phase) {
+        case 0:
+            if (!check(std::getenv("WILIWILI_CONFIG_DIR") != nullptr,"isolated profile required")) return;
+            // 主窗口必须已经在首帧呈现后显示出来
+            if (!check(glfwGetWindowAttrib(window, GLFW_VISIBLE) == GLFW_TRUE,"main window not shown after the first frame")) return;
+            brls::Application::getImeManager()->openForText(
+                [](const std::string& text) { imeResult = text; }, "回归测试", "", 32, "", 0);
+            advance(); break;
+        case 1: {
+            HWND dialog = FindWindowW(L"WiliwiliTextInput", nullptr);
+            if (!check(dialog != nullptr,"native input dialog missing")) return;
+            if (!check(IsWindowVisible(dialog) == TRUE,"native input dialog not visible")) return;
+            BYTE alpha = 0;
+            if (!check(GetLayeredWindowAttributes(dialog, nullptr, &alpha, nullptr) &&
+                       alpha == 255,"native input dialog was not revealed after painting")) return;
+            HWND edit = FindWindowExW(dialog, nullptr, L"Edit", nullptr);
+            if (!check(edit != nullptr,"native input edit control missing")) return;
+            if (!check(GetFocus() == edit,"native input edit control not focused")) return;
+            SetWindowTextW(edit, L"键盘测试");
+            PostMessageW(dialog, WM_COMMAND, IDOK, 0);
+            advance(); break;
+        }
+        case 2:
+            if (!check(FindWindowW(L"WiliwiliTextInput", nullptr) == nullptr,"native input dialog was not closed")) return;
+            if (!check(imeResult == "键盘测试","native input dialog returned the wrong text")) return;
+            if (!check(IsWindowEnabled(glfwGetWin32Window(window)) == TRUE,"main window stayed disabled after the dialog")) return;
+            result = 0; phase = -1;
+            brls::Logger::info("GO3 IME PASS: dialog opened, painted, focused, submitted and released the main window");
+            brls::Application::quit();
+            break;
+    }
+}
 // Opt-in scenario that drives the web-like player keys through the real view tree.
 int64_t keyAt = 0;
 brls::Activity* keyboardPlayerPage = nullptr;
@@ -237,6 +289,7 @@ void keyboardRegressionTick() {
     }
 }
 void go3PlayerRegressionTick() {
+    if (std::getenv("GO3_IME_SCENARIO")) { imeRegressionTick(); return; }
     if (std::getenv("GO3_KEYBOARD_SCENARIO")) { keyboardRegressionTick(); return; }
     if (const char* scenario = std::getenv("GO3_EXIT_SCENARIO")) { exitRegressionTick(scenario); return; }
     if (phase < 0) return;
