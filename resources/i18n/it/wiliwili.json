@@ -193,6 +193,7 @@
   "home": {
     "common": {
       "return_player": "Player",
+      "quit_confirm": "Close the app?",
             "pull_refresh": "Pull to refresh; slide up to cancel",
       "pull_release": "Release to refresh; slide up to cancel",
 

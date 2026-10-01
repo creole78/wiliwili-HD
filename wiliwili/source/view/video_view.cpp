@@ -19,6 +19,7 @@
 #include "utils/string_helper.hpp"
 #include "utils/gesture_helper.hpp"
 #include "utils/activity_helper.hpp"
+#include "utils/edge_back_gesture.hpp"
 #include "activity/player_activity.hpp"
 #include "fragment/player_danmaku_setting.hpp"
 #include "fragment/player_setting.hpp"
@@ -31,6 +32,7 @@
 #include "view/video_snapshot_core.hpp"
 #include "view/video_progress_slider.hpp"
 #include "view/svg_image.hpp"
+#include "view/custom_button.hpp"
 #include "view/grid_dropdown.hpp"
 #include "view/video_profile.hpp"
 #include "view/danmaku_core.hpp"
@@ -69,27 +71,34 @@ VideoView::VideoView() {
     desktopActions->setPositionTop(10);
     desktopActions->setPositionRight(130);
     desktopActions->setHeight(60);
-    const bool chinese = brls::Application::getLocale().rfind("zh", 0) == 0;
-    auto addDesktopAction = [desktopActions](const std::string& title, std::function<void()> action) {
-        auto* button = new brls::Button();
-        button->setText(title);
-        button->setFontSize(18);
-        button->setHeight(60);
-        button->setPadding(8);
+    // Back / minimise / close, drawn as the plain Windows style glyphs instead of
+    // text so the control bar stays unobtrusive.
+    auto addDesktopAction = [desktopActions](const std::string& icon, std::function<void()> action) {
+        auto* button = new CustomButton();
+        button->setFocusable(true);
+        button->setWidth(52);
+        button->setHeight(52);
         button->setMarginRight(6);
-        button->setStyle(&brls::BUTTONSTYLE_BORDERLESS);
-        button->setTextColor(nvgRGB(255,255,255));
+        button->setCornerRadius(26);
+        button->setHighlightCornerRadius(26);
+        button->setAlignItems(brls::AlignItems::CENTER);
+        button->setJustifyContent(brls::JustifyContent::CENTER);
+        auto* image = new SVGImage();
+        image->setDimensions(26, 26);
+        image->setImageFromSVGRes(icon);
+        button->addView(image);
         button->registerClickAction([action](brls::View*) { brls::sync(action); return true; });
+        button->addGestureRecognizer(new brls::TapGestureRecognizer(button));
         desktopActions->addView(button);
         return button;
     };
-    addDesktopAction(chinese ? "后台浏览" : "Browse", [] { Intent::backgroundPlayer(); });
-    addDesktopAction(chinese ? "最小化" : "Minimize", [] {
+    addDesktopAction("svg/osd-back.svg", [] { Intent::backgroundPlayer(); });
+    addDesktopAction("svg/osd-minimize.svg", [] {
         brls::Application::getPlatform()->minimizeWindow();
     });
-    addDesktopAction(chinese ? "退出程序" : "Quit", [] { Intent::quitApplication(); })->setId("video/app-exit");
+    addDesktopAction("svg/osd-close.svg", [] { Intent::quitApplication(); })->setId("video/app-exit");
     osdTopBox->addView(desktopActions);
-    this->getView("video/osd/title")->setMarginRight(460);
+    this->getView("video/osd/title")->setMarginRight(310);
 #endif
 
     this->setHideHighlightBackground(true);
@@ -214,6 +223,12 @@ VideoView::VideoView() {
         if (real_duration <= 0) return 0.2f;
         return getSeekRange(offset * real_duration) / (float)real_duration * 8.0f;
     });
+
+#ifdef _WIN32
+    // Registered before the OSD gesture: an edge swipe must win over seeking,
+    // while drags that start away from the edge keep seeking as before.
+    this->addGestureRecognizer(new EdgeBackGestureRecognizer([] { Intent::backgroundPlayer(); }));
+#endif
 
     /// 组件触摸事件
     /// 单击控制 OSD

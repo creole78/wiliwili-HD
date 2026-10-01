@@ -20,9 +20,12 @@
 #include "activity/main_activity.hpp"
 #include "utils/activity_helper.hpp"
 #include "utils/dialog_helper.hpp"
+#include "utils/edge_back_gesture.hpp"
 #include "view/custom_button.hpp"
 #include "view/auto_tab_frame.hpp"
 #include "view/svg_image.hpp"
+
+using namespace brls::literals;
 
 MainActivity::~MainActivity() { brls::Logger::debug("del MainActivity"); }
 
@@ -39,10 +42,33 @@ void MainActivity::onContentAvailable() {
     });
     resume->addGestureRecognizer(new brls::TapGestureRecognizer(resume));
     onResume();
+
+    // Swap an icon button to its highlighted glyph while focused.
+    auto bindIconFocus = [](brls::View* button, const std::string& normal, const std::string& focused) {
+        auto* custom = dynamic_cast<CustomButton*>(button);
+        if (!custom) return;
+        custom->getFocusEvent()->subscribe([custom, normal, focused](bool value) {
+            if (custom->getChildren().empty()) return;
+            auto* image = dynamic_cast<SVGImage*>(custom->getChildren()[0]);
+            if (image) image->setImageFromSVGRes(value ? focused : normal);
+        });
+    };
+    bindIconFocus(resume, "svg/ico-back.svg", "svg/ico-back-activate.svg");
+
 #ifdef _WIN32
     auto* exitButton = this->getView("main/exit");
     exitButton->registerClickAction([](brls::View*) { Intent::quitApplication(); return true; });
     exitButton->addGestureRecognizer(new brls::TapGestureRecognizer(exitButton));
+    bindIconFocus(exitButton, "svg/ico-close.svg", "svg/ico-close-activate.svg");
+
+    // Android style edge swipe: swiping in from a screen edge asks before quitting.
+    this->getContentView()->addGestureRecognizer(new EdgeBackGestureRecognizer([] {
+        brls::sync([] {
+            DialogHelper::showCancelableDialog("wiliwili/home/common/quit_confirm"_i18n,
+                                               [] { Intent::quitApplication(); });
+        });
+    }));
+
     this->registerAction(brls::BrlsKeyCombination(brls::BRLS_KBD_KEY_Q,
         brls::BRLS_KBD_MODIFIER_CTRL | brls::BRLS_KBD_MODIFIER_SHIFT),
         [](brls::View*) { Intent::quitApplication(); return true; });
@@ -51,10 +77,7 @@ void MainActivity::onContentAvailable() {
         return true;
     });
     homeBtn->addGestureRecognizer(new brls::TapGestureRecognizer(homeBtn));
-    homeBtn->getFocusEvent()->subscribe([this](bool focused) {
-        auto* icon = dynamic_cast<SVGImage*>(homeBtn->getChildren()[0]);
-        if (icon) icon->setImageFromSVGRes(focused ? "svg/ico-desktop-activate.svg" : "svg/ico-desktop.svg");
-    });
+    bindIconFocus(homeBtn, "svg/ico-minimize.svg", "svg/ico-minimize-activate.svg");
     homeBtn->setCustomNavigation([this](brls::FocusDirection direction) -> brls::View* {
         if (direction == brls::FocusDirection::RIGHT) return tabFrame->getActiveTab();
         if (direction == brls::FocusDirection::UP) return tabFrame->getSidebar();

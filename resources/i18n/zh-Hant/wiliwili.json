@@ -193,6 +193,7 @@
   "home": {
     "common": {
       "return_player": "播放器",
+      "quit_confirm": "確定要關閉程式嗎？",
             "pull_refresh": "下拉重新整理，上滑取消",
       "pull_release": "放開重新整理，上滑取消",
 
